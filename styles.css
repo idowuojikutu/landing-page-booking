@@ -1,0 +1,119 @@
+html{
+    font-size: 62.5%;
+    margin:0;
+    padding:0;
+    overflow-x: hidden;
+}
+body{
+    margin:0;
+    padding:0;
+    font-size:1.6rem;
+    font-family: 'Playfair Display', serif;
+}
+.row{
+    height:100vh;
+    min-width:100%;
+}
+.head-1{
+    background-size:cover;
+    background-repeat: no-repeat;
+    background-image: url(/skycraper.jpg);
+    position:relative;
+    color:white;
+}
+.head-2{
+    padding-left:5%;
+}
+.para-1{
+    
+    margin-left:5%;
+   /* padding:5% 0 0;*/
+    width:100%;
+    z-index:2;
+    position:relative;
+    text-align:justify;
+}
+.para-wrap{
+    margin-top:25%;
+}
+.overlay-color{
+    position:absolute;
+    background-color: #1565D8;
+    opacity:0.8;
+    width:99%;
+    height:100%;
+}
+.logo{
+    position:relative;
+    z-index:2;
+    margin:5%;
+}
+.verified{
+    fill:green;
+    width:2%;
+}
+.account{
+    text-align:right;
+}
+.sign-up{
+    text-decoration: none;
+    font-weight:bold;
+    color:#1565D8;
+}
+.side{
+    padding-right:5%;
+    padding-top:3%;
+    
+}
+.head-box{
+    margin:15% 0 0 10%;
+    display:flex;
+    height:50%;
+    flex-direction:column;
+    justify-content: space-between;
+}
+.box-1{
+    display:grid;
+    grid-template-columns:1fr 10fr;
+    grid-gap:5%;
+    padding:5%;
+    background-color: white;
+    box-shadow: 0px 0px 10px 3px #dee2e6;
+    border-radius:10px;
+    
+}
+.box-1:hover{
+    background-color: #e2eafc;
+    cursor:pointer;
+    border:1px solid #1565D8;
+}
+.box-2:hover{
+    background-color: #e2eafc;
+    cursor:pointer;
+    border:1px solid #1565D8;
+}
+.box-2{
+    display:grid;
+    grid-template-columns: 1fr 8fr;
+    box-shadow: 0px 0px 10px 3px #dee2e6;
+    grid-gap:5%;
+    padding:5%;
+    margin-top:5%;
+    border-radius:10px;
+}
+.side-icon{
+    padding-top:50%;
+    text-align:center;
+    background-color:blue;
+    color:white;
+    border-radius:100%;
+}
+a{
+    text-decoration:none;
+}
+.side p{
+    color:#6c757d;
+}
+h2{
+    font-size:4.0rem;
+}
