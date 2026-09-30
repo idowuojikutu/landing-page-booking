@@ -72,3 +72,77 @@ $('#searchModal').addEventListener('click',e=>{if(e.target.id==='searchModal'){e
 $('#searchInput').addEventListener('input',e=>{
   if(e.target.value.trim()) toast('Search ready for: '+e.target.value.trim());
 });
+
+
+/* Nova 2.0 premium interactions */
+const quickModal = $('#quickModal');
+const taskInput = $('#taskInput');
+
+function closeQuick(){
+  quickModal.classList.add('hidden');
+  quickModal.classList.remove('grid');
+  taskInput.value='';
+}
+$('#quickAddBtn').addEventListener('click',()=>{
+  quickModal.classList.remove('hidden'); quickModal.classList.add('grid');
+  setTimeout(()=>taskInput.focus(),60);
+});
+$('#closeQuick').addEventListener('click',closeQuick);
+$('#cancelQuick').addEventListener('click',closeQuick);
+$('#saveTask').addEventListener('click',()=>{
+  const value=taskInput.value.trim();
+  if(!value){ toast('Please enter a task first.'); return; }
+  const row=document.createElement('div');
+  row.className='flex items-center gap-3';
+  row.innerHTML='<span class="grid h-8 w-8 place-items-center rounded-lg bg-violet-50 text-violet-600">+</span><div class="min-w-0 flex-1"><p class="truncate text-xs font-bold"></p><p class="text-[10px] text-slate-400">New task</p></div><button class="taskDone text-[10px] font-bold text-violet-500">mark done</button>';
+  row.querySelector('p').textContent=value;
+  row.querySelector('.taskDone').addEventListener('click',()=>{
+    row.querySelector('.taskDone').textContent='done';
+    row.querySelector('.taskDone').className='text-[10px] font-bold text-emerald-500';
+    row.querySelector('span').textContent='✓';
+    row.querySelector('span').className='grid h-8 w-8 place-items-center rounded-lg bg-emerald-50 text-emerald-600';
+    toast('Task completed.');
+  });
+  $('#taskList').prepend(row);
+  closeQuick(); toast('New task added to your focus list.');
+});
+taskInput.addEventListener('keydown',e=>{if(e.key==='Enter')$('#saveTask').click();});
+
+$('#notifyBtn').addEventListener('click',e=>{
+  e.stopPropagation();
+  $('#notifyPanel').classList.toggle('hidden');
+});
+$('#clearNotifications').addEventListener('click',()=>{
+  $('#notificationList').innerHTML='<p class="rounded-xl bg-slate-100 p-4 text-xs text-slate-500 dark:bg-white/5">You are all caught up.</p>';
+  toast('Notifications cleared.');
+});
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#notifyBtn') && !e.target.closest('#notifyPanel')) $('#notifyPanel')?.classList.add('hidden');
+  if(e.target===quickModal) closeQuick();
+});
+
+function animateCounters(){
+  $$('[data-counter]').forEach(el=>{
+    const target=Number(el.dataset.counter), prefix=el.dataset.prefix||'', suffix=el.dataset.suffix||'';
+    const start=performance.now(), duration=1100;
+    function tick(now){
+      const p=Math.min((now-start)/duration,1), eased=1-Math.pow(1-p,4);
+      const value=target<100 ? (target*eased).toFixed(2) : Math.round(target*eased).toLocaleString();
+      el.textContent=prefix+value+suffix;
+      if(p<1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  });
+}
+window.addEventListener('load',animateCounters);
+
+const originalPeriodHandler=$('#periodSelect').onchange;
+$('#periodSelect').addEventListener('change',()=>{
+  const heights={
+    'Last 7 months':[48,63,52,78,65,92,76],
+    'Last 30 days':[35,58,44,70,61,82,96],
+    'Last 12 months':[62,49,71,58,84,68,91]
+  };
+  const bars=[...document.querySelectorAll('#overview .grid.h-64 .bg-gradient-to-t')];
+  (heights[$('#periodSelect').value]||heights['Last 7 months']).forEach((v,i)=>{if(bars[i])bars[i].style.height=v+'%';});
+});
