@@ -146,3 +146,46 @@ $('#periodSelect').addEventListener('change',()=>{
   const bars=[...document.querySelectorAll('#overview .grid.h-64 .bg-gradient-to-t')];
   (heights[$('#periodSelect').value]||heights['Last 7 months']).forEach((v,i)=>{if(bars[i])bars[i].style.height=v+'%';});
 });
+
+
+/* Nova 3 feature pack: smart insights, focus mode, command center */
+$('#focusModeBtn').addEventListener('click',()=>{
+  const active=document.body.classList.toggle('focus-mode');
+  let style=document.getElementById('focusModeStyle');
+  if(!style){
+    style=document.createElement('style');style.id='focusModeStyle';
+    style.textContent='body.focus-mode #sidebar,body.focus-mode header,body.focus-mode footer,body.focus-mode #insightsPanel,body.focus-mode #exportBtn,body.focus-mode #quickAddBtn,body.focus-mode #focusModeBtn{display:none!important}body.focus-mode main{padding-left:0!important}body.focus-mode section.mesh{min-height:100vh;padding-top:2rem}body.focus-mode #overview{max-width:1100px;margin:auto}';
+    document.head.appendChild(style);
+  }
+  $('#focusModeBtn').textContent=active?'↙ Exit focus':'◉ Focus';
+  toast(active?'Focus mode enabled':'Focus mode disabled');
+});
+
+function openCommand(){
+  $('#commandModal').classList.remove('hidden');$('#commandModal').classList.add('grid');
+  setTimeout(()=>$('#commandInput').focus(),40);
+}
+function closeCommand(){
+  $('#commandModal').classList.add('hidden');$('#commandModal').classList.remove('grid');
+}
+$$('[data-command]').forEach(btn=>btn.addEventListener('click',()=>{
+  const action=btn.dataset.command;closeCommand();
+  if(action==='focus')$('#focusModeBtn').click();
+  if(action==='export')$('#exportBtn').click();
+  if(action==='task')$('#quickAddBtn').click();
+}));
+$('#commandInput').addEventListener('keydown',e=>{
+  if(e.key!=='Enter')return;
+  const command=e.target.value.toLowerCase();closeCommand();
+  if(command.includes('focus'))$('#focusModeBtn').click();
+  else if(command.includes('export')||command.includes('report'))$('#exportBtn').click();
+  else if(command.includes('task')||command.includes('add'))$('#quickAddBtn').click();
+  else if(command.includes('dark')||command.includes('theme'))$('#themeBtn').click();
+  else toast('Try: focus, export, add task or theme.');
+});
+const priorKeyHandler = document.addEventListener;
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key.toLowerCase()==='p'){e.preventDefault();openCommand();}
+  if(e.key==='Escape')closeCommand();
+});
+$('#commandModal').addEventListener('click',e=>{if(e.target.id==='commandModal')closeCommand();});
