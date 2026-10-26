@@ -27,3 +27,91 @@ function openSearch(){$('#searchModal').classList.remove('hidden');$('#searchMod
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeSearch()}if(e.key==='/'&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){e.preventDefault();openSearch()}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openSearch()}});
 $('#searchModal').addEventListener('click',e=>{if(e.target.id==='searchModal')closeSearch()});$('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()});
 $('#dateLine').textContent=new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}).toUpperCase();render();
+
+
+/* ClearPath upgrades: recurring items, data portability, weekly reflection */
+const REVIEW_KEY='clearpath-weekly-review-v1';
+const reviews=()=>{try{return JSON.parse(localStorage.getItem(REVIEW_KEY))||{}}catch{return {}}};
+function exportBackup(){
+ const payload={app:'ClearPath',version:1,exportedAt:new Date().toISOString(),items,reviews:reviews()};
+ const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download='clearpath-backup-'+today()+'.json';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);toast('Backup downloaded to your device.');
+}
+$('#exportData').addEventListener('click',()=>{
+ const panel=$('#backupModal');panel.classList.remove('hidden');panel.classList.add('flex');
+});
+function closeBackup(){$('#backupModal').classList.add('hidden');$('#backupModal').classList.remove('flex');$('#importFile').value=''}
+$('#cancelBackup').addEventListener('click',closeBackup);
+$('#importBackup').addEventListener('click',async()=>{
+ const file=$('#importFile').files[0];if(!file){toast('Choose a ClearPath JSON backup first.');return}
+ try{
+  const data=JSON.parse(await file.text());
+  if(data.app!=='ClearPath'||!Array.isArray(data.items)||!data.items.every(x=>x&&typeof x.id==='string'&&typeof x.title==='string'&&['task','bill','goal'].includes(x.type))){throw new Error('Invalid backup')}
+  if(!confirm('Restore '+data.items.length+' items? This replaces your current ClearPath items.'))return;
+  items=data.items;persist();
+  if(data.reviews&&typeof data.reviews==='object')localStorage.setItem(REVIEW_KEY,JSON.stringify(data.reviews));
+  closeBackup();render();toast('Backup restored successfully.');
+ }catch(err){toast('That file is not a valid ClearPath backup.')}
+});
+$('#backupModal').addEventListener('click',e=>{if(e.target.id==='backupModal')closeBackup()});
+
+function reviewKey(){const d=new Date();const jan=new Date(d.getFullYear(),0,1);const week=Math.ceil((((d-jan)/86400000)+jan.getDay()+1)/7);return d.getFullYear()+'-W'+String(week).padStart(2,'0')}
+function openReview(){
+ const key=reviewKey(),all=reviews(),saved=all[key]||{};
+ const done=items.filter(x=>x.type==='task'&&x.done).length;
+ const open=items.filter(x=>x.type==='task'&&!x.done).length;
+ const overdue=items.filter(x=>!x.done&&x.date&&x.date<today()).length;
+ $('#reviewStats').innerHTML=[
+  ['Tasks completed',done,'text-emerald-700'],
+  ['Still on your list',open,'text-violet-700'],
+  ['Past due',overdue,'text-rose-600']
+ ].map(a=>'<div class="rounded-xl bg-slate-50 p-4 dark:bg-slate-800"><p class="text-xs text-slate-500">'+a[0]+'</p><p class="display mt-2 text-2xl font-extrabold '+a[2]+'">'+a[1]+'</p></div>').join('');
+ $('#reviewWins').value=saved.wins||'';$('#reviewNext').value=saved.next||'';
+ $('#reviewPanel').classList.remove('hidden');$('#reviewPanel').scrollIntoView({behavior:'smooth',block:'start'});
+}
+$('#weeklyReview').addEventListener('click',openReview);
+$('#closeReview').addEventListener('click',()=>$('#reviewPanel').classList.add('hidden'));
+$('#saveReview').addEventListener('click',()=>{
+ const all=reviews();all[reviewKey()]={wins:$('#reviewWins').value.trim(),next:$('#reviewNext').value.trim(),updatedAt:new Date().toISOString()};
+ localStorage.setItem(REVIEW_KEY,JSON.stringify(all));toast('Your weekly reflection is saved on this device.');
+});
+
+const originalSaveItem=saveItem;
+saveItem=function(e){
+ const before=editingId?items.find(x=>x.id===editingId):null;
+ originalSaveItem(e);
+ if(before&&before.repeat&&items.some(x=>x.id===before.id)){
+  const current=items.find(x=>x.id===before.id);if(current)current.repeat=before.repeat;
+ }
+};
+const repeatLabel=document.createElement('label');
+repeatLabel.className='mt-4 block text-xs font-bold';
+repeatLabel.innerHTML='Repeat <select id="itemRepeat" class="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm"><option value="none">Does not repeat</option><option value="weekly">Every week</option><option value="monthly">Every month</option><option value="yearly">Every year</option></select>';
+$('#itemDate').closest('label').parentElement.insertAdjacentElement('afterend',repeatLabel);
+const baseOpenModal=openModal;
+openModal=function(type='task',id=null){
+ baseOpenModal(type,id);
+ $('#itemRepeat').value=(id&&items.find(x=>x.id===id)?.repeat)||'none';
+};
+const baseSaveItem=saveItem;
+saveItem=function(e){
+ e.preventDefault();
+ const title=$('#itemTitle').value.trim();if(!title)return;
+ const type=$('#itemType').value;
+ const prior=editingId?items.find(x=>x.id===editingId):null;
+ const data={id:editingId||uid(),title,type,date:$('#itemDate').value,notes:$('#itemNotes').value.trim(),amount:type==='bill'?$('#itemAmount').value:'',progress:type==='goal'?Number($('#itemProgress').value):0,done:prior?!!prior.done:false,created:prior?.created||Date.now(),repeat:$('#itemRepeat').value};
+ if(editingId)items=items.map(x=>x.id===editingId?data:x);else items.unshift(data);
+ persist();closeModal();render();toast(data.repeat!=='none'?'Repeating item saved. Future occurrences are shown as a schedule rule.':prior?'Item updated.':'Saved — one less thing to remember.');
+};
+const baseRenderList=renderList;
+renderList=function(){
+ baseRenderList();
+ const kind={tasks:'task',bills:'bill',goals:'goal'}[page];
+ const repeatItems=items.filter(x=>x.type===kind&&x.repeat&&x.repeat!=='none');
+ if(repeatItems.length){
+  const note=document.createElement('p');note.className='md:col-span-2 xl:col-span-3 text-xs text-slate-400';
+  note.textContent='↻ '+repeatItems.length+' repeating item'+(repeatItems.length===1?'':'s')+' · recurrence is saved as a rule; automatic reminders and auto-generation require a future backend.';
+  $('#listContent').prepend(note);
+ }
+};
