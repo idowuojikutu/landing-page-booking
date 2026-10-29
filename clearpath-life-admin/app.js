@@ -115,3 +115,40 @@ renderList=function(){
   $('#listContent').prepend(note);
  }
 };
+
+
+/* ClearPath 2.1: focus mode, smart local insights, upcoming timeline */
+$('#focusToggle').addEventListener('click',()=>{
+ const enabled=document.body.classList.toggle('clearpath-focus');
+ let style=$('#clearpathFocusStyles');
+ if(!style){style=document.createElement('style');style.id='clearpathFocusStyles';style.textContent='body.clearpath-focus #sidebar,body.clearpath-focus header,body.clearpath-focus footer,body.clearpath-focus #insightsSection{display:none!important}body.clearpath-focus main{padding-left:0!important}body.clearpath-focus #homePage{max-width:1050px;margin:auto}body.clearpath-focus #listPage{max-width:1050px;margin:auto}';document.head.appendChild(style)}
+ $('#focusToggle').textContent=enabled?'Exit focus ↙':'Focus mode ◉';
+ toast(enabled?'Focus mode enabled':'Focus mode disabled');
+});
+function renderInsights(){
+ const open=items.filter(x=>x.type==='task'&&!x.done);
+ const overdue=items.filter(x=>!x.done&&x.date&&x.date<today());
+ const upcoming=items.filter(x=>!x.done&&x.date&&x.date>=today()).sort((a,b)=>a.date.localeCompare(b.date));
+ const top=upcoming[0];
+ const cards=[
+  {label:'Past-due items',value:String(overdue.length),detail:overdue.length?'Start with: '+overdue.slice(0,2).map(x=>x.title).join(', '):'You have no overdue items.',tone:overdue.length?'text-rose-600':'text-emerald-700'},
+  {label:'Open tasks',value:String(open.length),detail:open.length?'Pick one task and give it 15 focused minutes.':'Your task list is clear. Nice work.',tone:'text-violet-700'},
+  {label:'Next deadline',value:top?prettyDate(top.date):'All clear',detail:top?top.title:'Add a due date to see what is coming next.',tone:'text-amber-700'}
+ ];
+ $('#insightsGrid').innerHTML=cards.map(c=>'<article class="rounded-xl bg-slate-50 p-4 dark:bg-slate-800"><p class="text-xs font-semibold text-slate-500">'+esc(c.label)+'</p><p class="display mt-2 text-2xl font-extrabold '+c.tone+'">'+esc(c.value)+'</p><p class="mt-2 text-xs leading-5 text-slate-500">'+esc(c.detail)+'</p></article>').join('');
+}
+$('#refreshInsights').addEventListener('click',()=>{renderInsights();toast('Insights refreshed from your saved items.')});
+function openTimeline(){
+ const list=items.filter(x=>!x.done&&x.date).sort((a,b)=>a.date.localeCompare(b.date));
+ $('#calendarList').innerHTML=list.map(x=>'<article class="flex items-start gap-3 rounded-xl bg-slate-50 p-4 dark:bg-slate-800"><div class="min-w-16 rounded-lg bg-white px-3 py-2 text-center dark:bg-slate-700"><b class="block text-xs">'+esc(new Date(x.date+'T12:00:00').toLocaleDateString(undefined,{month:'short'}).toUpperCase())+'</b><b class="display text-xl">'+esc(new Date(x.date+'T12:00:00').getDate())+'</b></div><div class="min-w-0 flex-1"><p class="font-bold">'+esc(x.title)+'</p><p class="mt-1 text-xs text-slate-500">'+esc(typeName(x.type))+' · '+esc(prettyDate(x.date))+(x.repeat&&x.repeat!=='none'?' · repeats '+esc(x.repeat):'')+'</p>'+(x.notes?'<p class="mt-2 text-xs text-slate-500">'+esc(x.notes)+'</p>':'')+'</div><button data-timeline-edit="'+x.id+'" class="text-xs font-bold text-emerald-700">Edit</button></article>').join('')||'<p class="rounded-xl bg-slate-50 p-5 text-sm text-slate-500 dark:bg-slate-800">No dated open items yet. Add a due date to a task, bill, or goal to build your timeline.</p>';
+ $('#calendarModal').classList.remove('hidden');$('#calendarModal').classList.add('flex');
+ $$('[data-timeline-edit]').forEach(b=>b.onclick=()=>{closeTimeline();const x=items.find(i=>i.id===b.dataset.timelineEdit);if(x)openModal(x.type,x.id)});
+}
+function closeTimeline(){$('#calendarModal').classList.add('hidden');$('#calendarModal').classList.remove('flex')}
+$('#timelineOpen').addEventListener('click',openTimeline);
+$('#closeCalendar').addEventListener('click',closeTimeline);
+$('#calendarModal').addEventListener('click',e=>{if(e.target.id==='calendarModal')closeTimeline()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeTimeline()});
+const previousRender=render;
+render=function(){previousRender();renderInsights()};
+renderInsights();
