@@ -152,3 +152,61 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeTimeline()});
 const previousRender=render;
 render=function(){previousRender();renderInsights()};
 renderInsights();
+
+/* ClearPath 2.2: focus timer, daily habit streak, CSV export */
+(function(){
+ const toolsPanel=document.createElement('section');
+ toolsPanel.id='clearpathTools';
+ toolsPanel.className='surface mt-5 grid gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 sm:grid-cols-2 dark:bg-slate-900';
+ toolsPanel.innerHTML=
+ '<article class="rounded-xl bg-slate-50 p-4 dark:bg-slate-800">'+
+ '<p class="text-xs font-bold uppercase tracking-widest text-violet-600">Deep work</p>'+
+ '<h3 class="display mt-1 text-lg font-extrabold">Focus timer</h3>'+
+ '<p id="cpTimer" class="display my-4 text-4xl font-extrabold tabular-nums">25:00</p>'+
+ '<div class="flex flex-wrap gap-2"><button id="cpTimerStart" class="rounded-lg bg-[#101b2d] px-3 py-2 text-xs font-bold text-white">Start</button><button id="cpTimerReset" class="rounded-lg border px-3 py-2 text-xs font-bold">Reset</button><select id="cpTimerLength" aria-label="Focus session length" class="rounded-lg border bg-transparent px-2 text-xs"><option value="25">25 min</option><option value="15">15 min</option><option value="45">45 min</option><option value="60">60 min</option></select></div>'+
+ '<p class="mt-3 text-xs text-slate-500">A simple countdown for one uninterrupted work session.</p></article>'+
+ '<article class="rounded-xl bg-slate-50 p-4 dark:bg-slate-800">'+
+ '<p class="text-xs font-bold uppercase tracking-widest text-emerald-700">Daily consistency</p>'+
+ '<h3 class="display mt-1 text-lg font-extrabold">Daily check-in</h3>'+
+ '<p id="cpHabitStatus" class="mt-3 text-sm text-slate-500">Build a small daily habit by checking in once a day.</p>'+
+ '<p class="my-3"><strong id="cpHabitStreak" class="display text-3xl">0</strong> <span class="text-xs text-slate-500">day streak</span></p>'+
+ '<button id="cpHabitCheck" class="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white">Complete today</button>'+
+ '<p class="mt-3 text-xs text-slate-500">Your check-ins are saved on this device.</p></article>';
+ const anchor=document.querySelector('#insightsSection')||document.querySelector('#homePage');
+ if(anchor)anchor.parentNode.insertBefore(toolsPanel,anchor);
+ let remaining=25*60, timer=null;
+ const timerText=toolsPanel.querySelector('#cpTimer'), start=toolsPanel.querySelector('#cpTimerStart'), length=toolsPanel.querySelector('#cpTimerLength');
+ function showTime(){timerText.textContent=String(Math.floor(remaining/60)).padStart(2,'0')+':'+String(remaining%60).padStart(2,'0')}
+ function stopTimer(){if(timer){clearInterval(timer);timer=null}start.textContent='Start'}
+ start.addEventListener('click',()=>{
+  if(timer){clearInterval(timer);timer=null;start.textContent='Resume';return}
+  if(remaining<=0)remaining=Number(length.value)*60;
+  start.textContent='Pause';
+  timer=setInterval(()=>{remaining--;showTime();if(remaining<=0){clearInterval(timer);timer=null;start.textContent='Start';toast('Focus session complete. Take a short break!')}},1000);
+ });
+ toolsPanel.querySelector('#cpTimerReset').addEventListener('click',()=>{stopTimer();remaining=Number(length.value)*60;showTime()});
+ length.addEventListener('change',()=>{stopTimer();remaining=Number(length.value)*60;showTime()});
+ showTime();
+ const HABIT_KEY='clearpath-daily-checkins-v1';
+ function readDays(){try{return JSON.parse(localStorage.getItem(HABIT_KEY))||[]}catch{return []}}
+ function streak(days){const set=new Set(days),d=new Date();let count=0;if(!set.has(today()))d.setDate(d.getDate()-1);while(set.has(new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10))){count++;d.setDate(d.getDate()-1)}return count}
+ function renderHabit(){
+  const days=readDays(),done=days.includes(today());
+  toolsPanel.querySelector('#cpHabitStreak').textContent=streak(days);
+  toolsPanel.querySelector('#cpHabitStatus').textContent=done?'You have checked in today. Keep the momentum going!':'One small step today is enough to keep your streak alive.';
+  const b=toolsPanel.querySelector('#cpHabitCheck');b.disabled=done;b.textContent=done?'Completed today ✓':'Complete today';b.classList.toggle('opacity-50',done);
+ }
+ toolsPanel.querySelector('#cpHabitCheck').addEventListener('click',()=>{const days=readDays();if(!days.includes(today()))days.push(today());localStorage.setItem(HABIT_KEY,JSON.stringify(days));renderHabit();toast('Daily check-in saved. Well done!')});
+ renderHabit();
+ const exportBtn=document.createElement('button');
+ exportBtn.id='cpCsvExport';exportBtn.type='button';exportBtn.className='hidden rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-500 md:block dark:bg-slate-800';exportBtn.textContent='⇩ CSV';
+ const backup=document.querySelector('#exportData');
+ if(backup&&backup.parentNode)backup.parentNode.insertBefore(exportBtn,backup);
+ exportBtn.addEventListener('click',()=>{
+  const columns=['title','type','date','done','amount','progress','repeat','notes'];
+  const quote=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+  const csv=[columns.join(','),...items.map(item=>columns.map(k=>quote(item[k])).join(','))].join('\r\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='clearpath-export-'+today()+'.csv';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);toast('CSV export downloaded.');
+ });
+})();
