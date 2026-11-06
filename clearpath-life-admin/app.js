@@ -210,3 +210,57 @@ renderInsights();
   const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='clearpath-export-'+today()+'.csv';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);toast('CSV export downloaded.');
  });
 })();
+
+/* ClearPath 2.3: quick capture, weekly target, opt-in deadline alerts */
+(function(){
+ const panel=document.createElement('section');
+ panel.id='cpGrowthTools';
+ panel.className='surface mt-5 grid gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 sm:grid-cols-3 dark:bg-slate-900';
+ panel.innerHTML=
+ '<article class="rounded-xl bg-slate-50 p-4 dark:bg-slate-800"><p class="text-xs font-bold uppercase tracking-widest text-sky-700">Capture quickly</p><h3 class="display mt-1 text-lg font-extrabold">Quick add task</h3><form id="cpQuickForm" class="mt-3 flex gap-2"><input id="cpQuickTitle" maxlength="120" required placeholder="What needs doing?" class="min-w-0 flex-1 rounded-lg border bg-white px-3 py-2 text-sm dark:bg-slate-900"><button class="rounded-lg bg-[#101b2d] px-3 py-2 text-xs font-bold text-white">Add</button></form><p class="mt-2 text-xs text-slate-500">Adds a task straight to your list.</p></article>'+
+ '<article class="rounded-xl bg-slate-50 p-4 dark:bg-slate-800"><p class="text-xs font-bold uppercase tracking-widest text-violet-700">Weekly momentum</p><h3 class="display mt-1 text-lg font-extrabold">Completion target</h3><div class="mt-3 flex items-center gap-2"><input id="cpWeeklyTarget" type="number" min="1" max="100" value="5" class="w-20 rounded-lg border bg-white px-3 py-2 text-sm dark:bg-slate-900"><span class="text-xs text-slate-500">tasks per week</span></div><p id="cpWeeklyCount" class="mt-3 text-sm font-semibold">0 / 5 completed</p><div class="mt-2 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"><div id="cpWeeklyBar" class="h-full rounded-full bg-violet-600" style="width:0%"></div></div><p class="mt-2 text-xs text-slate-500">Counts tasks completed this week where completion timestamps exist.</p></article>'+
+ '<article class="rounded-xl bg-slate-50 p-4 dark:bg-slate-800"><p class="text-xs font-bold uppercase tracking-widest text-amber-700">Stay ahead</p><h3 class="display mt-1 text-lg font-extrabold">Deadline alerts</h3><p class="mt-2 text-xs text-slate-500">Allow browser notifications for overdue items and deadlines due within 24 hours when ClearPath is open.</p><button id="cpEnableAlerts" class="mt-3 rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white">Enable notifications</button><p id="cpAlertStatus" class="mt-2 text-xs text-slate-500" aria-live="polite"></p></article>';
+ const anchor=document.querySelector('#clearpathTools')||document.querySelector('#insightsSection')||document.querySelector('#homePage');
+ if(anchor&&anchor.parentNode)anchor.parentNode.insertBefore(panel,anchor.nextSibling);
+ panel.querySelector('#cpQuickForm').addEventListener('submit',e=>{
+  e.preventDefault();const field=panel.querySelector('#cpQuickTitle'),title=field.value.trim();if(!title)return;
+  items.unshift({id:uid(),title,type:'task',date:'',notes:'',amount:'',progress:0,done:false,created:Date.now(),repeat:'none'});
+  persist();render();field.value='';toast('Task captured and added to your list.');
+ });
+ const TARGET_KEY='clearpath-weekly-completion-target-v1',targetInput=panel.querySelector('#cpWeeklyTarget');
+ try{targetInput.value=String(Math.max(1,Math.min(100,Number(localStorage.getItem(TARGET_KEY))||5)))}catch(e){}
+ function weekStart(){const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-(d.getDay()+6)%7);return d.getTime()}
+ function updateTarget(){
+  const target=Math.max(1,Math.min(100,Number(targetInput.value)||5));
+  const done=items.filter(x=>x.type==='task'&&x.done&&Number(x.completedAt||x.updatedAt||0)>=weekStart()).length;
+  panel.querySelector('#cpWeeklyCount').textContent=done+' / '+target+' completed this week';
+  panel.querySelector('#cpWeeklyBar').style.width=Math.min(100,Math.round(done/target*100))+'%';
+  try{localStorage.setItem(TARGET_KEY,String(target))}catch(e){}
+ }
+ targetInput.addEventListener('change',updateTarget);
+ const priorRender=render;render=function(){priorRender();updateTarget()};updateTarget();
+ const alertButton=panel.querySelector('#cpEnableAlerts'),alertStatus=panel.querySelector('#cpAlertStatus');
+ function checkDeadlines(){
+  if(!('Notification' in window)||Notification.permission!=='granted')return;
+  const now=new Date(),limit=new Date(now.getTime()+86400000);
+  items.filter(x=>!x.done&&x.date).forEach(x=>{
+   const due=new Date(x.date+'T23:59:00');
+   if(due<=limit){
+    const key='clearpath-alert-'+x.id+'-'+x.date;if(localStorage.getItem(key))return;
+    new Notification(due<now?'ClearPath: overdue item':'ClearPath: deadline approaching',{body:x.title+' · '+(due<now?'Past due':'Due '+prettyDate(x.date))});
+    localStorage.setItem(key,'1');
+   }
+  });
+ }
+ function updateAlertLabel(){
+  if(!('Notification' in window)){alertStatus.textContent='Notifications are not supported in this browser.';alertButton.disabled=true;return}
+  alertStatus.textContent=Notification.permission==='granted'?'Notifications enabled on this device.':'Permission: '+Notification.permission;
+  alertButton.textContent=Notification.permission==='granted'?'Check deadlines now':'Enable notifications';
+ }
+ alertButton.addEventListener('click',async()=>{
+  if(!('Notification' in window)){updateAlertLabel();return}
+  if(Notification.permission==='default')await Notification.requestPermission();
+  updateAlertLabel();if(Notification.permission==='granted'){checkDeadlines();toast('Deadline alerts checked. Keep ClearPath open for checks.')}
+ });
+ updateAlertLabel();if('Notification' in window&&Notification.permission==='granted')checkDeadlines();
+})();
